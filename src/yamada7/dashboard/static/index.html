@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>yamada7 Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>yamada7 ダッシュボード</h1>
+      <p>フィードバックループの状態とメトリクスを監視します。</p>
+    </header>
+    <main>
+      <section id="summary">
+        <div class="card">
+          <h2>最新状態</h2>
+          <dl id="latest-state">
+            <dt>Tick</dt>
+            <dd id="latest-tick">-</dd>
+            <dt>Life</dt>
+            <dd id="latest-life">-</dd>
+            <dt>Resources</dt>
+            <dd id="latest-resources">-</dd>
+            <dt>Danger</dt>
+            <dd id="latest-danger">-</dd>
+            <dt>Unknown</dt>
+            <dd id="latest-unknown">-</dd>
+            <dt>Total Reward</dt>
+            <dd id="latest-reward">-</dd>
+          </dl>
+        </div>
+        <div class="card">
+          <h2>メモ</h2>
+          <p><strong>恐怖更新</strong> <span id="latest-fear">-</span></p>
+          <p><strong>好奇心更新</strong> <span id="latest-curiosity">-</span></p>
+          <p><strong>プラン概要</strong></p>
+          <pre id="latest-plan">-</pre>
+        </div>
+      </section>
+      <section id="charts">
+        <div class="card">
+          <h2>ライフ / 資源 / 危険度</h2>
+          <canvas id="metrics-chart"></canvas>
+        </div>
+      </section>
+      <section id="log">
+        <div class="card">
+          <h2>最新スナップショット</h2>
+          <pre id="latest-raw">ロード中...</pre>
+        </div>
+        <div class="card">
+          <h2>イベントログ</h2>
+          <ul id="events-list"></ul>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <span>データ更新間隔: <span id="refresh-interval">2000</span> ms</span>
+      <button id="refresh-btn">即時更新</button>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

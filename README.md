@@ -29,8 +29,41 @@
 
 ## このリポジトリで扱うもの
 
-- `design.md`: 実現方法やアーキテクチャ設計。  
-- `agents.md`: ループ内で連携するエージェントの役割とインターフェース。  
+- `design.md`: 実現方法やアーキテクチャ設計（エージェント構成を含む）。  
 - ブラウザベースの可視化ダッシュボード（ターン進行・恐怖/好奇心指標・メモリを表示）。  
 - `playground/`: LLMが自由に試行錯誤するためのサンドボックス領域。  
 - プロトタイピング用のスクリプトやログ収集のためのツール類（今後追加予定）。
+
+## はじめ方
+
+1. 仮想環境を作り依存関係をインストールする:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e .
+   ```
+2. グリッドワールドシミュレータでループを実行する:
+   ```bash
+   python scripts/run_sim.py --ticks 50 --dashboard
+   ```
+3. ブラウザで `http://127.0.0.1:8765/ui/` にアクセスし、リアルタイムダッシュボードを確認する（APIは `/snapshots`・`/metrics`・`/events` から取得可能）。
+
+### Claude Code CLI を利用する場合
+
+LLMプランナーを本番モードに切り替えるには `claude code` CLI をインストールした上で、以下のように実行します。
+
+```bash
+python scripts/run_sim.py --ticks 50 --dashboard \
+  --llm-mode claude-cli \
+  --claude-binary claude \
+  --claude-model claude-4-5-sonnet-latest
+```
+
+- `--llm-mode claude-cli` を指定すると `claude code` にプロンプトを投げ、`--dangerously-skip-permissions` オプション付きで実行します（デフォルトで有効）。
+- 追加の CLI 引数が必要な場合は `--claude-extra-arg "--xxx"` を複数回指定します。
+- `--claude-allow-permissions` を付けると `--dangerously-skip-permissions` を無効化できます。
+
+## ドキュメント運用
+
+- このリポジトリ内のドキュメントおよびコミットメッセージは原則として日本語で記述すること。
+- 外部と共有する際に英語版が必要になった場合は別ファイルとして追加し、READMEでは日本語版を正とする。
