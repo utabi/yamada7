@@ -104,3 +104,5 @@ class LoopSnapshot:
     reward: RewardBreakdown
     reflection: Reflection
     events: List[ExecutionEvent] = field(default_factory=list)
+    playbook_updates: List[Dict[str, Any]] = field(default_factory=list)
+    playbook_stats: Dict[str, Any] = field(default_factory=dict)

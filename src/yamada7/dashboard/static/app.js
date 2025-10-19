@@ -11,7 +11,11 @@ const latestCuriosity = document.getElementById("latest-curiosity");
 const latestPlan = document.getElementById("latest-plan");
 const latestRaw = document.getElementById("latest-raw");
 const eventsList = document.getElementById("events-list");
+const playbookUpdates = document.getElementById("playbook-updates");
 const refreshBtn = document.getElementById("refresh-btn");
+const playbookStatsFiles = document.getElementById("playbook-stats-files");
+const playbookStatsSections = document.getElementById("playbook-stats-sections");
+const playbookStatsChars = document.getElementById("playbook-stats-chars");
 
 let timer = null;
 let chart = null;
@@ -177,6 +181,45 @@ function renderEvents(events) {
     });
 }
 
+function renderPlaybookUpdates(updates) {
+  playbookUpdates.innerHTML = "";
+  if (!updates || !updates.length) {
+    const empty = document.createElement("li");
+    empty.textContent = "プレイブックの更新はありません";
+    playbookUpdates.appendChild(empty);
+    return;
+  }
+  updates
+    .slice()
+    .reverse()
+    .forEach((update) => {
+      const li = document.createElement("li");
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = `<span>${update.target}</span><span>${update.status ?? update.change_type}</span>`;
+      const content = document.createElement("div");
+      content.className = "content";
+      const preview = update.content ? String(update.content).slice(0, 160) : "";
+      const body = update.reason ? `${update.change_type}: ${update.reason}` : update.change_type;
+      content.textContent = preview ? `${body}\n${preview}` : body;
+      li.appendChild(meta);
+      li.appendChild(content);
+      playbookUpdates.appendChild(li);
+    });
+}
+
+function renderPlaybookStats(stats) {
+  if (!stats || typeof stats !== "object") {
+    playbookStatsFiles.textContent = "-";
+    playbookStatsSections.textContent = "-";
+    playbookStatsChars.textContent = "-";
+    return;
+  }
+  playbookStatsFiles.textContent = stats.files ?? "-";
+  playbookStatsSections.textContent = stats.sections ?? "-";
+  playbookStatsChars.textContent = stats.characters ?? "-";
+}
+
 async function refresh() {
   try {
     const [metricsRes, latestRes, eventsRes] = await Promise.all([
@@ -193,6 +236,8 @@ async function refresh() {
     }
     updateRawSnapshot(latest);
     renderEvents(events);
+    renderPlaybookUpdates(latest?.playbook_updates ?? []);
+    renderPlaybookStats(latest?.playbook_stats ?? null);
   } catch (err) {
     console.error("更新に失敗しました", err);
   }

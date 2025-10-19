@@ -96,6 +96,34 @@ pre {
   gap: 0.25rem;
 }
 
+#playbook-updates {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+#playbook-updates li {
+  background: rgba(14, 165, 233, 0.08);
+  border-left: 4px solid #0ea5e9;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+#playbook-updates li .meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+#playbook-updates li .content {
+  white-space: pre-wrap;
+}
+
 #events-list li .meta {
   font-size: 0.8rem;
   color: var(--muted);

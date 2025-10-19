@@ -17,3 +17,5 @@ coverage/
 htmlcov/
 node_modules/
 playground/.tmp/
+data/
+note.html

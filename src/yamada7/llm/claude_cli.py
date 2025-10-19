@@ -54,12 +54,64 @@ class ClaudeCodeClient:
         reflection = self._reflection_from_dict(reflection_dict) if reflection_dict else None
         return plan, reflection
 
+    def generate_playbook_deltas(self, payload: Dict) -> List[Dict]:
+        prompt = textwrap.dedent(
+            """
+            あなたは戦術アナリストです。実行ログと振り返りをもとに、進化するプレイブックへの差分を提案してください。
+            出力は以下のJSON形式のみとし、日本語で簡潔に記述します。
+
+            {
+              "deltas": [
+                {
+                  "target": string,
+                  "change_type": "add" | "update" | "retire",
+                  "content": string,
+                  "priority": number,
+                  "tags": [string],
+                  "evidence": [string]
+                }
+              ]
+            }
+
+            制約:
+            - 「警戒ログ」「探査ログ」「プレイブック」といった表現を使用し、特定の感情語に依存しない。
+            - 事実に基づき、過度な推測は避ける。
+            - 3件以内に収める。
+
+            入力データ:
+            {payload}
+            """
+        ).strip()
+        rendered = prompt.format(payload=json.dumps(payload, ensure_ascii=False))
+        response = self._invoke(rendered) or {}
+        deltas = response.get("deltas") if isinstance(response, dict) else []
+        if not isinstance(deltas, list):
+            return []
+        clean: List[Dict] = []
+        for entry in deltas:
+            if not isinstance(entry, dict):
+                continue
+            content = (entry.get("content") or "").strip()
+            if not content:
+                continue
+            clean.append(
+                {
+                    "target": entry.get("target", "general"),
+                    "change_type": entry.get("change_type", "add"),
+                    "content": content,
+                    "priority": entry.get("priority", 0.5),
+                    "tags": entry.get("tags") or [],
+                    "evidence": entry.get("evidence") or [],
+                }
+            )
+        return clean
+
     # internal helpers
     def _build_prompt(self, state: Dict, allowed_actions: List[str], memory: Dict[str, List[str]]) -> str:
         template = textwrap.dedent(
             """
             あなたは自分の生存を最優先するエージェントの頭脳です。
-            現在の状態と利用できるアクション候補、警戒ログと探査ログを渡します。
+            現在の状態と利用できるアクション候補、警戒ログ・探査ログ・プレイブック抜粋を渡します。
             以下のJSON形式のみで回答してください。
 
             {{

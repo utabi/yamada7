@@ -129,10 +129,10 @@ class LLMThinker:
             )
 
         notes = ""
-        if memory_blurbs.get("fear"):
-            notes += f"Recent fear: {memory_blurbs['fear'][-1]}. "
-        if memory_blurbs.get("curiosity"):
-            notes += f"Curiosity focus: {memory_blurbs['curiosity'][-1]}."
+        if memory_blurbs.get("alert"):
+            notes += f"Alert note: {memory_blurbs['alert'][-1]}. "
+        if memory_blurbs.get("exploration"):
+            notes += f"Exploration focus: {memory_blurbs['exploration'][-1]}."
 
         return ActionPlan(intent=primary_intent, sub_goals=sub_goals, actions=candidates, notes=notes.strip())
 
@@ -157,4 +157,3 @@ class LLMThinker:
         )
 
         return Reflection(summary=summary_text, fear_updates=fear_updates, curiosity_updates=curiosity_updates, next_bias=bias)
-

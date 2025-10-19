@@ -1,7 +1,8 @@
 # yamada7
 
 `yamada7`は「恐怖心と好奇心の創発」をテーマにしたAI一体型システムの実験プロジェクトです。  
-生存を最優先目標に据えた自律的エージェントを構築し、危険回避と環境探索がどのようにバランスするかを観察・検証します。
+生存を最優先目標に据えた自律的エージェントを構築し、危険回避と環境探索がどのようにバランスするかを観察・検証します。  
+現在は Agentic Context Engineering (ACE) をベースに、LLM自身が進化させる「プレイブック」を中核に据えています。
 
 ## 背景
 
@@ -15,9 +16,11 @@
    - ライフ・資源・時間などの指標を組み合わせ、死ぬまでの累積スコアを追求させる。
 2. **恐怖の学習**  
    - 危険シグナルと被ダメージを逐次フィードバックし、リスク予測と回避戦略を獲得させる。
-3. **好奇心の創発**  
+3. **探索欲求の創発**  
    - 未知領域の探索や情報獲得に内発報酬を与え、生存と探索のトレードオフを自律的に調整させる。
-4. **LLM中心の思考ループ**  
+4. **ACEによる自己改善**  
+   - Executor（実行）、Reflector（振り返り）、Curator（調整）が連携し、行動ログからプレイブックを差分更新し続ける。
+5. **LLM中心の思考ループ**  
    - 各ターンでLLMが状況分析・計画・反省を行い、行動系列を決定する。補助的なアルゴリズムはLLM思考を支援する位置付け。
 
 ## 進行イメージ
@@ -29,9 +32,10 @@
 
 ## このリポジトリで扱うもの
 
-- `design.md`: 実現方法やアーキテクチャ設計（エージェント構成を含む）。  
-- ブラウザベースの可視化ダッシュボード（ターン進行・恐怖/好奇心指標・メモリを表示）。  
+- `design.md`: 実現方法やアーキテクチャ設計（ACE構成とエージェント役割を含む）。  
+- ブラウザベースの可視化ダッシュボード（ターン進行・メトリクス・プレイブック差分を表示）。  
 - `playground/`: LLMが自由に試行錯誤するためのサンドボックス領域。  
+- `data/playbook/`: ACEが管理する進化型プレイブック（JSON/Markdown）。  
 - プロトタイピング用のスクリプトやログ収集のためのツール類（今後追加予定）。
 
 ## はじめ方
@@ -48,6 +52,23 @@
    ```
 3. ブラウザで `http://127.0.0.1:8765/ui/` にアクセスし、リアルタイムダッシュボードを確認する（APIは `/snapshots`・`/metrics`・`/events` から取得可能）。
 
+### ACE プレイブックを有効にする
+
+ACEを稼働させると、Reflector/Curator が行動ログを解析し、`data/playbook/` 以下に差分を蓄積します。
+
+```bash
+python scripts/run_sim.py --ticks 50 --dashboard \
+  --enable-ace \
+  --playbook-root data/playbook
+```
+
+- `--enable-ace` が未指定のときは従来のメモリ（FIFOログ）のみ使用します。  
+- `--playbook-refine-every 20` のように指定すると、20ターンごとにGrow-and-Refine処理でプレイブックを再整理します。  
+- プレイブックはJSONL差分とMarkdownサマリで保存され、ダッシュボードの「Playbook」タブに反映されます。
+- `--playbook-context-limit` や `--playbook-context-chars` で計画生成時に渡す断片数と長さを調整できます。  
+- `--playbook-max-sections` はGrow-and-Refine時に各ファイルへ残すセクション数を設定します。
+- ダッシュボードでは更新履歴とともにプレイブック統計（ファイル数・セクション数・総文字数）が確認できます。
+
 ### Claude Code CLI を利用する場合
 
 LLMプランナーを本番モードに切り替えるには `claude code` CLI をインストールした上で、以下のように実行します。
@@ -59,9 +80,11 @@ python scripts/run_sim.py --ticks 50 --dashboard \
   --claude-model claude-4-5-sonnet-latest
 ```
 
-- `--llm-mode claude-cli` を指定すると `claude code` にプロンプトを投げ、`--dangerously-skip-permissions` オプション付きで実行します（デフォルトで有効）。
-- 追加の CLI 引数が必要な場合は `--claude-extra-arg "--xxx"` を複数回指定します。
+- `--llm-mode claude-cli` を指定すると `claude code` にプロンプトを投げ、`--dangerously-skip-permissions` オプション付きで実行します（デフォルトで有効）。  
+- 追加の CLI 引数が必要な場合は `--claude-extra-arg "--xxx"` を複数回指定します。  
 - `--claude-allow-permissions` を付けると `--dangerously-skip-permissions` を無効化できます。
+
+ACEをClaude CLIモードで動かす場合は Reflector/Curator も同CLIを経由します（高頻度呼び出しになるためAPI制限に注意してください）。
 
 ## ドキュメント運用
 

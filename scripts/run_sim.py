@@ -8,7 +8,8 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from yamada7.config import DEFAULT_CONFIG, LLMConfig, LoopConfig
+from yamada7.ace import ACECurator, ACEReflector, PlaybookStore
+from yamada7.config import ACEConfig, DEFAULT_CONFIG, LLMConfig, LoopConfig
 from yamada7.core import (
     ExecutionEngine,
     FeedbackLoop,
@@ -50,6 +51,44 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="--dangerously-skip-permissions を無効化する場合に指定。",
     )
+    parser.add_argument("--enable-ace", action="store_true", help="ACEプレイブック更新を有効化する")
+    parser.add_argument(
+        "--ace-mode",
+        choices=["auto", "heuristic", "llm"],
+        default="auto",
+        help="ACE Reflector のモード。auto は LLM モードに追従。",
+    )
+    parser.add_argument("--playbook-root", default=None, help="プレイブック保存先ディレクトリ")
+    parser.add_argument(
+        "--playbook-refine-every",
+        type=int,
+        default=None,
+        help="Grow-and-Refine を実行するターン間隔（0以下で無効）。",
+    )
+    parser.add_argument(
+        "--ace-max-deltas",
+        type=int,
+        default=None,
+        help="1ターンで適用するプレイブック差分の上限（未指定時は設定値を利用）。",
+    )
+    parser.add_argument(
+        "--playbook-context-limit",
+        type=int,
+        default=None,
+        help="計画生成時に参照するプレイブック断片の数 (default: config値)。",
+    )
+    parser.add_argument(
+        "--playbook-context-chars",
+        type=int,
+        default=None,
+        help="1断片あたりの最大文字数 (default: config値)。",
+    )
+    parser.add_argument(
+        "--playbook-max-sections",
+        type=int,
+        default=None,
+        help="Grow-and-Refine時に保持するセクション数 (default: config値)。",
+    )
     return parser.parse_args()
 
 
@@ -68,6 +107,43 @@ def build_config(args: argparse.Namespace) -> LoopConfig:
         claude_extra_args=_extra_args(args.claude_extra_arg),
         claude_skip_permissions=not args.claude_allow_permissions,
     )
+    ace_mode = args.ace_mode
+    if ace_mode == "auto":
+        ace_mode = "llm" if llm_cfg.mode == "claude-cli" else "heuristic"
+    playbook_root = Path(args.playbook_root) if args.playbook_root else DEFAULT_CONFIG.ace.playbook_root
+    refine_interval = (
+        args.playbook_refine_every
+        if args.playbook_refine_every is not None
+        else DEFAULT_CONFIG.ace.refine_interval
+    )
+    max_deltas = (
+        args.ace_max_deltas if args.ace_max_deltas is not None else DEFAULT_CONFIG.ace.max_deltas_per_tick
+    )
+    context_limit = (
+        args.playbook_context_limit
+        if args.playbook_context_limit is not None
+        else DEFAULT_CONFIG.ace.playbook_context_limit
+    )
+    context_chars = (
+        args.playbook_context_chars
+        if args.playbook_context_chars is not None
+        else DEFAULT_CONFIG.ace.playbook_context_chars
+    )
+    max_sections = (
+        args.playbook_max_sections
+        if args.playbook_max_sections is not None
+        else DEFAULT_CONFIG.ace.playbook_max_sections
+    )
+    ace_cfg = ACEConfig(
+        enabled=args.enable_ace,
+        mode=ace_mode,
+        playbook_root=playbook_root,
+        refine_interval=max(0, refine_interval),
+        max_deltas_per_tick=max(1, max_deltas),
+        playbook_context_limit=max(1, context_limit),
+        playbook_context_chars=max(80, context_chars),
+        playbook_max_sections=max(1, max_sections),
+    )
     cfg = LoopConfig(
         tick_limit=args.ticks,
         dashboard_host=DEFAULT_CONFIG.dashboard_host,
@@ -76,6 +152,7 @@ def build_config(args: argparse.Namespace) -> LoopConfig:
         playground_path=DEFAULT_CONFIG.playground_path,
         enabled_channels=DEFAULT_CONFIG.enabled_channels,
         llm=llm_cfg,
+        ace=ace_cfg,
     )
     return cfg
 
@@ -113,6 +190,22 @@ def main():
 
     thinker = LLMThinker(config=config.llm, seed=args.seed, claude_client=claude_client)
 
+    playbook_store = None
+    ace_reflector = None
+    ace_curator = None
+    if config.ace.enabled:
+        playbook_store = PlaybookStore(
+            config.ace.playbook_root,
+            context_limit=config.ace.playbook_context_limit,
+            context_chars=config.ace.playbook_context_chars,
+            max_sections=config.ace.playbook_max_sections,
+        )
+        ace_reflector = ACEReflector(
+            mode=config.ace.mode,
+            claude_client=claude_client if config.ace.mode == "llm" else None,
+        )
+        ace_curator = ACECurator(max_per_tick=config.ace.max_deltas_per_tick)
+
     loop = FeedbackLoop(
         environment=environment,
         state_formatter=state_formatter,
@@ -122,6 +215,9 @@ def main():
         execution_engine=execution_engine,
         thinker=thinker,
         config=config,
+        playbook_store=playbook_store,
+        ace_reflector=ace_reflector,
+        ace_curator=ace_curator,
     )
 
     if args.dashboard:
