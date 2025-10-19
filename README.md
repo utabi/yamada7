@@ -71,6 +71,16 @@ PYTHONPATH=./src python scripts/run_sim.py --ticks 50 --dashboard \
 - ダッシュボードでは更新履歴とともにプレイブック統計（ファイル数・セクション数・総文字数）が確認できます。
 - `--episodes` で連続エピソードを実行し平均値を集計できます。`--headless` でダッシュボードを起動せずにCLIのみ実行、`--save-run logs` で各スナップショットをJSONLに保存することも可能です。
 
+#### ログ解析
+
+`--save-run` などで保存した JSONL ログは以下で集計できます。
+
+```bash
+python scripts/analyze_snapshots.py logs/
+```
+
+エピソード数・平均ティック数・平均報酬に加え、プレイブック更新の上位ターゲットや最新統計が表示されます。
+
 ### Claude Code CLI を利用する場合
 
 LLMプランナーを本番モードに切り替えるには `claude code` CLI をインストールした上で、以下のように実行します。
