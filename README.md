@@ -50,14 +50,15 @@
    ```bash
    python scripts/run_sim.py --ticks 50 --dashboard
    ```
-3. ブラウザで `http://127.0.0.1:8765/ui/` にアクセスし、リアルタイムダッシュボードを確認する（APIは `/snapshots`・`/metrics`・`/events` から取得可能）。
+3. (`fastapi` と `uvicorn` をインストール済みの場合) ブラウザで `http://127.0.0.1:8765/ui/` にアクセスし、リアルタイムダッシュボードを確認する（APIは `/snapshots`・`/metrics`・`/events` から取得可能）。  
+   ダッシュボードを利用しない場合は `python scripts/run_sim.py --ticks 50 --headless` のように `--headless` を付与する。
 
 ### ACE プレイブックを有効にする
 
 ACEを稼働させると、Reflector/Curator が行動ログを解析し、`data/playbook/` 以下に差分を蓄積します。
 
 ```bash
-python scripts/run_sim.py --ticks 50 --dashboard \
+PYTHONPATH=./src python scripts/run_sim.py --ticks 50 --dashboard \
   --enable-ace \
   --playbook-root data/playbook
 ```
@@ -68,6 +69,7 @@ python scripts/run_sim.py --ticks 50 --dashboard \
 - `--playbook-context-limit` や `--playbook-context-chars` で計画生成時に渡す断片数と長さを調整できます。  
 - `--playbook-max-sections` はGrow-and-Refine時に各ファイルへ残すセクション数を設定します。
 - ダッシュボードでは更新履歴とともにプレイブック統計（ファイル数・セクション数・総文字数）が確認できます。
+- `--episodes` で連続エピソードを実行し平均値を集計できます。`--headless` でダッシュボードを起動せずにCLIのみ実行、`--save-run logs` で各スナップショットをJSONLに保存することも可能です。
 
 ### Claude Code CLI を利用する場合
 

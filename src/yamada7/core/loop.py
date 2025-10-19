@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
-from ..ace import ACECurator, ACEReflector, PlaybookStore
+from typing import TYPE_CHECKING
+
 from ..config import LoopConfig, DEFAULT_CONFIG
 from ..env.base import Environment
 from ..llm.thinker import LLMThinker
@@ -13,6 +14,9 @@ from .models import Channel, ExecutionEvent, LoopSnapshot, Observation
 from .result_formatter import ResultFormatter
 from .reward import RewardSynthesizer
 from .state_formatter import StateFormatter
+
+if TYPE_CHECKING:
+    from ..ace import ACECurator, ACEReflector, PlaybookStore
 
 
 DashboardPublisher = Callable[[LoopSnapshot], None]
@@ -29,7 +33,7 @@ class FeedbackLoop:
     memory_manager: MemoryManager
     execution_engine: ExecutionEngine
     thinker: LLMThinker
-    config: LoopConfig = DEFAULT_CONFIG
+    config: LoopConfig = field(default_factory=LoopConfig)
     playbook_store: Optional[PlaybookStore] = None
     ace_reflector: Optional[ACEReflector] = None
     ace_curator: Optional[ACECurator] = None

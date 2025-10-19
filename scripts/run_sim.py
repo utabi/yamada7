@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from yamada7.ace import ACECurator, ACEReflector, PlaybookStore
 from yamada7.config import ACEConfig, DEFAULT_CONFIG, LLMConfig, LoopConfig
 from yamada7.core import (
     ExecutionEngine,
@@ -17,10 +19,16 @@ from yamada7.core import (
     ResultFormatter,
     RewardSynthesizer,
     StateFormatter,
+    LoopSnapshot,
+    ExecutionEvent,
 )
-from yamada7.dashboard import DashboardServer
 from yamada7.env import GridWorldEnvironment
 from yamada7.llm import ClaudeCodeClient, LLMThinker
+
+try:
+    from yamada7.ace import ACECurator, ACEReflector, PlaybookStore
+except ImportError:  # pragma: no cover - fallback when ACE is not installed
+    ACECurator = ACEReflector = PlaybookStore = None
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger("yamada7.runner")
@@ -50,6 +58,22 @@ def parse_args() -> argparse.Namespace:
         "--claude-allow-permissions",
         action="store_true",
         help="--dangerously-skip-permissions を無効化する場合に指定。",
+    )
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=1,
+        help="実行するエピソード数。各エピソードは環境をリセットして再開する。",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="ダッシュボードを起動せずにCLI実行のみ行う。",
+    )
+    parser.add_argument(
+        "--save-run",
+        default=None,
+        help="スナップショットを保存するディレクトリ。未指定の場合は保存しない。",
     )
     parser.add_argument("--enable-ace", action="store_true", help="ACEプレイブック更新を有効化する")
     parser.add_argument(
@@ -161,15 +185,16 @@ def main():
     args = parse_args()
     config = build_config(args)
 
+    if config.ace.enabled and (ACECurator is None or ACEReflector is None or PlaybookStore is None):
+        raise RuntimeError("ACEモジュールが読み込めません。インストール状況を確認してください。")
+
     memory_path = Path(config.memory_root)
     memory_path.mkdir(parents=True, exist_ok=True)
 
-    environment = GridWorldEnvironment(seed=args.seed)
     state_formatter = StateFormatter()
     result_formatter = ResultFormatter()
     reward_synthesizer = RewardSynthesizer()
     memory_manager = MemoryManager(root=memory_path)
-    execution_engine = ExecutionEngine(allowed_actions=environment.action_schema)
     claude_client = None
     if config.llm.mode == "claude-cli":
         claude_client = ClaudeCodeClient(
@@ -206,40 +231,157 @@ def main():
         )
         ace_curator = ACECurator(max_per_tick=config.ace.max_deltas_per_tick)
 
-    loop = FeedbackLoop(
-        environment=environment,
-        state_formatter=state_formatter,
-        result_formatter=result_formatter,
-        reward_synthesizer=reward_synthesizer,
-        memory_manager=memory_manager,
-        execution_engine=execution_engine,
-        thinker=thinker,
-        config=config,
-        playbook_store=playbook_store,
-        ace_reflector=ace_reflector,
-        ace_curator=ace_curator,
-    )
+    dashboard_publisher = None
+    if args.dashboard and not args.headless:
+        try:
+            from yamada7.dashboard import DashboardServer
+        except ModuleNotFoundError as exc:  # pragma: no cover - missing optional dependency
+            raise RuntimeError("ダッシュボードを利用するには fastapi と uvicorn が必要です。") from exc
 
-    if args.dashboard:
         dashboard = DashboardServer(config=config)
         dashboard.run_in_thread()
-        loop.attach_dashboard(dashboard.publisher())
+        dashboard_publisher = dashboard.publisher()
         logger.info("Dashboard server running at http://%s:%s", config.dashboard_host, config.dashboard_port)
 
-    snapshots = loop.run(max_ticks=config.tick_limit)
-    logger.info("Simulation completed with %d snapshots", len(snapshots))
+    summaries: List[Dict[str, float]] = []
+    base_seed = args.seed
+    save_root = Path(args.save_run) if args.save_run else None
+    if save_root:
+        save_root.mkdir(parents=True, exist_ok=True)
 
-    if snapshots:
-        last = snapshots[-1]
-        logger.info(
-            "Final state: tick=%s life=%s resources=%s danger=%s unknown=%s reward=%.3f",
-            last.tick,
-            last.observation.data.get("life"),
-            last.observation.data.get("resources"),
-            last.observation.data.get("danger"),
-            last.observation.data.get("unknown"),
-            last.reward.external_reward + last.reward.internal_reward,
+    for episode_index in range(max(1, args.episodes)):
+        episode_seed = base_seed + episode_index
+        environment = GridWorldEnvironment(seed=episode_seed)
+        execution_engine = ExecutionEngine(allowed_actions=environment.action_schema)
+        loop = FeedbackLoop(
+            environment=environment,
+            state_formatter=state_formatter,
+            result_formatter=result_formatter,
+            reward_synthesizer=reward_synthesizer,
+            memory_manager=memory_manager,
+            execution_engine=execution_engine,
+            thinker=thinker,
+            config=config,
+            playbook_store=playbook_store,
+            ace_reflector=ace_reflector,
+            ace_curator=ace_curator,
         )
+        if dashboard_publisher:
+            loop.attach_dashboard(dashboard_publisher)
+
+        snapshots = loop.run(max_ticks=config.tick_limit)
+        summary = summarize_episode(snapshots, episode_index)
+        summaries.append(summary)
+
+        logger.info(
+            "Episode %d finished: ticks=%s total_reward=%.3f final_life=%s final_unknown=%s",
+            episode_index + 1,
+            summary["ticks"],
+            summary["total_reward"],
+            summary["final_life"],
+            summary["final_unknown"],
+        )
+
+        if save_root:
+            save_episode_snapshots(save_root, episode_index, snapshots)
+
+    report = aggregate_summaries(summaries)
+    logger.info(
+        "Aggregated: episodes=%d avg_ticks=%.2f avg_reward=%.3f",
+        report["episodes"],
+        report["avg_ticks"],
+        report["avg_reward"],
+    )
+
+
+def summarize_episode(snapshots: List[LoopSnapshot], episode_index: int) -> Dict[str, float]:
+    if not snapshots:
+        return {
+            "episode": episode_index + 1,
+            "ticks": 0,
+            "total_reward": 0.0,
+            "final_life": 0.0,
+            "final_unknown": 0.0,
+        }
+
+    total_reward = sum(s.reward.external_reward + s.reward.internal_reward for s in snapshots)
+    final = snapshots[-1]
+    return {
+        "episode": episode_index + 1,
+        "ticks": len(snapshots),
+        "total_reward": total_reward,
+        "final_life": final.observation.data.get("life", 0.0),
+        "final_unknown": final.observation.data.get("unknown", 0.0),
+    }
+
+
+def aggregate_summaries(summaries: List[Dict[str, float]]) -> Dict[str, float]:
+    episodes = len(summaries)
+    if episodes == 0:
+        return {"episodes": 0, "avg_ticks": 0.0, "avg_reward": 0.0}
+    avg_ticks = sum(item["ticks"] for item in summaries) / episodes
+    avg_reward = sum(item["total_reward"] for item in summaries) / episodes
+    return {"episodes": episodes, "avg_ticks": avg_ticks, "avg_reward": avg_reward}
+
+
+def save_episode_snapshots(root: Path, episode_index: int, snapshots: List[LoopSnapshot]):
+    if not snapshots:
+        return
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    file_path = root / f"episode-{episode_index + 1}-{timestamp}.jsonl"
+    with file_path.open("w", encoding="utf-8") as fh:
+        for snapshot in snapshots:
+            fh.write(json.dumps(serialize_snapshot(snapshot), ensure_ascii=False) + "\n")
+
+
+def serialize_snapshot(snapshot: LoopSnapshot) -> Dict:
+    def serialize_events(events: List[ExecutionEvent]) -> List[Dict[str, Any]]:
+        return [
+            {
+                "timestamp": event.timestamp.isoformat(),
+                "channel": event.channel.value,
+                "payload": event.payload,
+            }
+            for event in events
+        ]
+
+    return {
+        "tick": snapshot.tick,
+        "observation": asdict(snapshot.observation),
+        "formatted_state": {
+            "summary": snapshot.formatted_state.summary,
+            "slots": snapshot.formatted_state.slots,
+            "memory_highlights": snapshot.formatted_state.memory_highlights,
+        },
+        "action_plan": {
+            "intent": snapshot.action_plan.intent,
+            "sub_goals": snapshot.action_plan.sub_goals,
+            "actions": [
+                {
+                    "action_id": action.action_id,
+                    "parameters": action.parameters,
+                    "confidence": action.confidence,
+                    "risk_estimate": action.risk_estimate,
+                }
+                for action in snapshot.action_plan.actions
+            ],
+            "notes": snapshot.action_plan.notes,
+        },
+        "reward": {
+            "external": snapshot.reward.external_reward,
+            "internal": snapshot.reward.internal_reward,
+            "components": snapshot.reward.components,
+        },
+        "reflection": {
+            "summary": snapshot.reflection.summary,
+            "alert_updates": snapshot.reflection.fear_updates,
+            "exploration_updates": snapshot.reflection.curiosity_updates,
+            "next_bias": snapshot.reflection.next_bias,
+        },
+        "events": serialize_events(snapshot.events),
+        "playbook_updates": snapshot.playbook_updates,
+        "playbook_stats": snapshot.playbook_stats,
+    }
 
 
 if __name__ == "__main__":

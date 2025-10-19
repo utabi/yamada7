@@ -19,3 +19,4 @@ node_modules/
 playground/.tmp/
 data/
 note.html
+logs/
