@@ -3,13 +3,15 @@ from __future__ import annotations
 import threading
 from collections import deque
 from dataclasses import asdict, dataclass, field
+import json
+import asyncio
 from pathlib import Path
 from typing import Deque, Dict, List
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..config import LoopConfig, DEFAULT_CONFIG
@@ -87,6 +89,21 @@ class DashboardServer:
                 return {"item": None}
             return {"item": self._snapshots[-1]}
 
+        @self.app.get("/sse/timeline")
+        async def sse_timeline():
+            async def event_generator():
+                last_index = 0
+                while True:
+                    snapshots = list(self._snapshots)
+                    while last_index < len(snapshots):
+                        payload = snapshots[last_index]
+                        last_index += 1
+                        yield _format_sse("snapshot", payload)
+                    yield ": keepalive\n\n"
+                    await asyncio.sleep(0.5)
+
+            return StreamingResponse(event_generator(), media_type="text/event-stream")
+
     def publisher(self) -> callable:
         def _inner(snapshot: LoopSnapshot):
             self._snapshots.append(_snapshot_to_dict(snapshot))
@@ -137,3 +154,7 @@ def _event_to_dict(event: ExecutionEvent) -> Dict:
         "channel": event.channel.value,
         "payload": event.payload,
     }
+
+
+def _format_sse(event_name: str, payload: Dict) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

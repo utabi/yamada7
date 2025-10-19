@@ -19,6 +19,9 @@ const playbookStatsChars = document.getElementById("playbook-stats-chars");
 
 let timer = null;
 let chart = null;
+let eventSource = null;
+const metricsHistory = [];
+const eventsHistory = [];
 
 refreshIndicator.textContent = REFRESH_MS;
 
@@ -245,7 +248,9 @@ async function refresh() {
 
 function start() {
   refresh();
-  timer = setInterval(refresh, REFRESH_MS);
+  if (!setupSSE()) {
+    timer = setInterval(refresh, REFRESH_MS);
+  }
 }
 
 refreshBtn.addEventListener("click", refresh);
@@ -253,9 +258,72 @@ refreshBtn.addEventListener("click", refresh);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     clearInterval(timer);
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
   } else {
     start();
   }
 });
 
 start();
+
+function setupSSE() {
+  if (!!window.EventSource === false) {
+    return false;
+  }
+  if (eventSource) {
+    eventSource.close();
+  }
+  eventSource = new EventSource("/sse/timeline");
+  eventSource.addEventListener("snapshot", (event) => {
+    try {
+      const snapshot = JSON.parse(event.data);
+      handleSnapshot(snapshot);
+    } catch (err) {
+      console.error("SSE snapshot parse error", err);
+    }
+  });
+  eventSource.onerror = () => {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    setTimeout(setupSSE, 2000);
+  };
+  return true;
+}
+
+function handleSnapshot(snapshot) {
+  if (!snapshot || !snapshot.observation) return;
+
+  const obs = snapshot.observation.data || {};
+  const metricsEntry = {
+    tick: snapshot.tick,
+    life: obs.life ?? null,
+    resources: obs.resources ?? null,
+    danger: obs.danger ?? null,
+    unknown: obs.unknown ?? null,
+    reward: (snapshot.reward?.external_reward ?? 0) + (snapshot.reward?.internal_reward ?? 0),
+    external_reward: snapshot.reward?.external_reward ?? 0,
+    internal_reward: snapshot.reward?.internal_reward ?? 0,
+    fear_note: snapshot.reflection?.fear_updates?.slice(-1)[0] ?? "",
+    curiosity_note: snapshot.reflection?.curiosity_updates?.slice(-1)[0] ?? "",
+  };
+
+  metricsHistory.push(metricsEntry);
+  if (metricsHistory.length > 200) metricsHistory.shift();
+
+  if (snapshot.events && Array.isArray(snapshot.events)) {
+    snapshot.events.forEach((evt) => eventsHistory.push(evt));
+    while (eventsHistory.length > 200) eventsHistory.shift();
+    renderEvents(eventsHistory);
+  }
+
+  updateLatestCard(metricsEntry);
+  updateChart(metricsHistory);
+  updateRawSnapshot(snapshot);
+  renderPlaybookUpdates(snapshot.playbook_updates ?? []);
+  renderPlaybookStats(snapshot.playbook_stats ?? null);
+}
