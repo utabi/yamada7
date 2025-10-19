@@ -82,6 +82,20 @@ python scripts/analyze_snapshots.py logs/
 
 エピソード数・平均ティック数・平均報酬に加え、プレイブック更新の上位ターゲットや最新統計が表示されます。
 
+#### 設定ファイル
+
+`--config run.json` のように指定すると、JSONファイルからオプションを読み込みます（コマンドライン引数が優先）。キーはCLIオプションの名前と同じにします。
+
+```json
+{
+  "ticks": 80,
+  "episodes": 5,
+  "headless": true,
+  "enable_ace": true,
+  "ace_mode": "heuristic"
+}
+```
+
 ### テスト
 
 optional依存をインストールした上で `pytest` を実行します。

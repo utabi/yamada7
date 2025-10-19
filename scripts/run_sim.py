@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger("yamada7.runner")
 
 
-def parse_args() -> argparse.Namespace:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run yamada7 survival loop")
     parser.add_argument("--ticks", type=int, default=50, help="Maximum ticks to simulate")
     parser.add_argument("--dashboard", action="store_true", help="Start dashboard server")
@@ -80,6 +80,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="集計結果をJSONで保存するパス。未指定の場合は標準出力のみ。",
     )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="JSONファイルからオプションを読み込む。CLI引数が優先される。",
+    )
     parser.add_argument("--enable-ace", action="store_true", help="ACEプレイブック更新を有効化する")
     parser.add_argument(
         "--ace-mode",
@@ -118,7 +123,17 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Grow-and-Refine時に保持するセクション数 (default: config値)。",
     )
-    return parser.parse_args()
+    return parser
+
+
+def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
+    parser = build_parser()
+    defaults = parser.parse_args([])
+    args = parser.parse_args(argv)
+    if args.config:
+        config_data = load_config_file(Path(args.config))
+        apply_config_overrides(args, defaults, config_data)
+    return args
 
 
 def _extra_args(value: Optional[List[str]]) -> List[str]:
@@ -341,6 +356,21 @@ def save_report(path: Path, report: Dict[str, Any]):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         json.dump(report, fh, ensure_ascii=False, indent=2)
+
+
+def load_config_file(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    with path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def apply_config_overrides(args: argparse.Namespace, defaults: argparse.Namespace, config_data: Dict[str, Any]):
+    for key, value in config_data.items():
+        if not hasattr(args, key):
+            continue
+        if getattr(args, key) == getattr(defaults, key):
+            setattr(args, key, value)
 
 
 def save_episode_snapshots(root: Path, episode_index: int, snapshots: List[LoopSnapshot]):
