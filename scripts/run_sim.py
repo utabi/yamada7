@@ -75,6 +75,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="スナップショットを保存するディレクトリ。未指定の場合は保存しない。",
     )
+    parser.add_argument(
+        "--save-report",
+        default=None,
+        help="集計結果をJSONで保存するパス。未指定の場合は標準出力のみ。",
+    )
     parser.add_argument("--enable-ace", action="store_true", help="ACEプレイブック更新を有効化する")
     parser.add_argument(
         "--ace-mode",
@@ -292,6 +297,8 @@ def main():
         report["avg_ticks"],
         report["avg_reward"],
     )
+    if args.save_report:
+        save_report(Path(args.save_report), report)
 
 
 def summarize_episode(snapshots: List[LoopSnapshot], episode_index: int) -> Dict[str, float]:
@@ -318,10 +325,22 @@ def summarize_episode(snapshots: List[LoopSnapshot], episode_index: int) -> Dict
 def aggregate_summaries(summaries: List[Dict[str, float]]) -> Dict[str, float]:
     episodes = len(summaries)
     if episodes == 0:
-        return {"episodes": 0, "avg_ticks": 0.0, "avg_reward": 0.0}
+        return {"episodes": 0, "avg_ticks": 0.0, "avg_reward": 0.0, "total_reward": 0.0}
     avg_ticks = sum(item["ticks"] for item in summaries) / episodes
     avg_reward = sum(item["total_reward"] for item in summaries) / episodes
-    return {"episodes": episodes, "avg_ticks": avg_ticks, "avg_reward": avg_reward}
+    total_reward = sum(item["total_reward"] for item in summaries)
+    return {
+        "episodes": episodes,
+        "avg_ticks": avg_ticks,
+        "avg_reward": avg_reward,
+        "total_reward": total_reward,
+    }
+
+
+def save_report(path: Path, report: Dict[str, Any]):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        json.dump(report, fh, ensure_ascii=False, indent=2)
 
 
 def save_episode_snapshots(root: Path, episode_index: int, snapshots: List[LoopSnapshot]):

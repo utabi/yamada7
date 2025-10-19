@@ -69,7 +69,7 @@ PYTHONPATH=./src python scripts/run_sim.py --ticks 50 --dashboard \
 - `--playbook-context-limit` や `--playbook-context-chars` で計画生成時に渡す断片数と長さを調整できます。  
 - `--playbook-max-sections` はGrow-and-Refine時に各ファイルへ残すセクション数を設定します。
 - ダッシュボードでは更新履歴とともにプレイブック統計（ファイル数・セクション数・総文字数）が確認できます。
-- `--episodes` で連続エピソードを実行し平均値を集計できます。`--headless` でダッシュボードを起動せずにCLIのみ実行、`--save-run logs` で各スナップショットをJSONLに保存することも可能です。
+- `--episodes` で連続エピソードを実行し平均値を集計できます。`--headless` でダッシュボードを起動せずにCLIのみ実行、`--save-run logs` で各スナップショットをJSONLに保存することも可能です。`--save-report reports/summary.json` を指定すると集計結果をJSONで保存します。
 
 #### ログ解析
 
