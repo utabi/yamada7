@@ -71,6 +71,7 @@ PYTHONPATH=./src python scripts/run_sim.py --ticks 50 --dashboard \
 - ダッシュボードでは更新履歴とともにプレイブック統計（ファイル数・セクション数・総文字数）が確認できます。
 - `--episodes` で連続エピソードを実行し平均値を集計できます。`--headless` でダッシュボードを起動せずにCLIのみ実行、`--save-run logs` で各スナップショットをJSONLに保存することも可能です。`--save-report reports/summary.json` を指定すると集計結果をJSONで保存します。
 - ダッシュボードはSSE（Server-Sent Events）でライブ更新されるため、ブラウザをリロードせずに最新スナップショットが反映されます。
+- `--linger 120` のように指定すると実行完了後も指定秒数プロセスを維持でき、ダッシュボードをゆっくり確認できます。
 
 #### ログ解析
 

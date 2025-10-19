@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import time
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -79,6 +80,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-report",
         default=None,
         help="集計結果をJSONで保存するパス。未指定の場合は標準出力のみ。",
+    )
+    parser.add_argument(
+        "--linger",
+        type=float,
+        default=0.0,
+        help="実行完了後に指定秒数だけプロセスを残す（ダッシュボード観察などに利用）。",
     )
     parser.add_argument(
         "--config",
@@ -314,6 +321,10 @@ def main():
     )
     if args.save_report:
         save_report(Path(args.save_report), report)
+
+    if args.linger > 0:
+        logger.info("Linger for %.1f seconds before exit", args.linger)
+        time.sleep(args.linger)
 
 
 def summarize_episode(snapshots: List[LoopSnapshot], episode_index: int) -> Dict[str, float]:

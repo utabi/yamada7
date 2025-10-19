@@ -14,6 +14,7 @@ def test_apply_config_overrides(tmp_path):
         "ticks": 99,
         "episodes": 3,
         "enable_ace": True,
+        "linger": 15,
     }
     config_path.write_text(json.dumps(config_data), encoding="utf-8")
 
@@ -21,12 +22,14 @@ def test_apply_config_overrides(tmp_path):
     assert args.ticks == 10  # CLI should win
     assert args.episodes == 3
     assert args.enable_ace is True
+    assert args.linger == 15
 
 
 def test_parse_args_with_config(tmp_path):
     config = {
         "ticks": 70,
         "headless": True,
+        "linger": 5,
     }
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")
@@ -34,3 +37,4 @@ def test_parse_args_with_config(tmp_path):
     args = run_sim.parse_args(["--config", str(config_path)])
     assert args.ticks == 70
     assert args.headless is True
+    assert args.linger == 5

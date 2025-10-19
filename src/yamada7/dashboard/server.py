@@ -28,7 +28,7 @@ def _snapshot_to_dict(snapshot: LoopSnapshot) -> Dict:
 class DashboardServer:
     """FastAPI-based dashboard backend for real-time monitoring."""
 
-    config: LoopConfig = DEFAULT_CONFIG
+    config: LoopConfig = field(default_factory=LoopConfig)
     buffer_size: int = 512
     app: FastAPI = field(init=False)
     _snapshots: Deque[Dict] = field(init=False)
