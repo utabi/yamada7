@@ -5,6 +5,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 import json
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import Deque, Dict, List
 
@@ -157,4 +158,10 @@ def _event_to_dict(event: ExecutionEvent) -> Dict:
 
 
 def _format_sse(event_name: str, payload: Dict) -> str:
-    return f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    return f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=False, default=_json_default)}\n\n"
+
+
+def _json_default(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")

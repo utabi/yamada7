@@ -88,6 +88,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="実行完了後に指定秒数だけプロセスを残す（ダッシュボード観察などに利用）。",
     )
     parser.add_argument(
+        "--tick-delay",
+        type=float,
+        default=20.0,
+        help="各ターン実行後に挟む待機秒数。リアルタイム観察用 (default: 20秒)。",
+    )
+    parser.add_argument(
         "--config",
         default=None,
         help="JSONファイルからオプションを読み込む。CLI引数が優先される。",
@@ -296,7 +302,7 @@ def main():
         if dashboard_publisher:
             loop.attach_dashboard(dashboard_publisher)
 
-        snapshots = loop.run(max_ticks=config.tick_limit)
+        snapshots = loop.run(max_ticks=config.tick_limit, tick_delay=args.tick_delay)
         summary = summarize_episode(snapshots, episode_index)
         summaries.append(summary)
 

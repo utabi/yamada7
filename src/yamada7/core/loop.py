@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import time
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
@@ -40,7 +41,7 @@ class FeedbackLoop:
     dashboard_handlers: List[DashboardPublisher] = field(default_factory=list)
     _ace_history: List[float] = field(default_factory=list, init=False)
 
-    def run(self, max_ticks: Optional[int] = None) -> List[LoopSnapshot]:
+    def run(self, max_ticks: Optional[int] = None, tick_delay: float = 0.0) -> List[LoopSnapshot]:
         tick_limit = max_ticks or self.config.tick_limit
         snapshots: List[LoopSnapshot] = []
 
@@ -98,6 +99,9 @@ class FeedbackLoop:
 
             observation = new_observation
             previous_unknown = observation.data.get("unknown", 0.0)
+
+            if tick_delay > 0 and not observation.done:
+                time.sleep(tick_delay)
 
             if observation.done:
                 break

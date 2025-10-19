@@ -15,6 +15,7 @@ def test_apply_config_overrides(tmp_path):
         "episodes": 3,
         "enable_ace": True,
         "linger": 15,
+        "tick_delay": 5.0,
     }
     config_path.write_text(json.dumps(config_data), encoding="utf-8")
 
@@ -23,6 +24,7 @@ def test_apply_config_overrides(tmp_path):
     assert args.episodes == 3
     assert args.enable_ace is True
     assert args.linger == 15
+    assert args.tick_delay == 5.0
 
 
 def test_parse_args_with_config(tmp_path):
@@ -30,6 +32,7 @@ def test_parse_args_with_config(tmp_path):
         "ticks": 70,
         "headless": True,
         "linger": 5,
+        "tick_delay": 1.5,
     }
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")
@@ -38,3 +41,4 @@ def test_parse_args_with_config(tmp_path):
     assert args.ticks == 70
     assert args.headless is True
     assert args.linger == 5
+    assert args.tick_delay == 1.5
