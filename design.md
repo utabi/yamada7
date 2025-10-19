@@ -71,6 +71,8 @@ CLIから `--episodes` オプションを指定すると複数エピソードを
 
 `scripts/analyze_snapshots.py` で保存済みJSONLを読み込み、エピソード指標やプレイブック更新の頻度分布を確認できる。上位ターゲットの把握によりCuratorの閾値調整やGrow-and-Refine方針見直しに活用する。
 
+`tests/` フォルダに PlaybookStore とログ解析のユニットテストを配置し、`pip install .[dev]` 後に `PYTHONPATH=./src pytest` で検証できる。
+
 ## 報酬と内発動機
 
 - **外部報酬**  

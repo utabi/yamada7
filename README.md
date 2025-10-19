@@ -81,6 +81,15 @@ python scripts/analyze_snapshots.py logs/
 
 エピソード数・平均ティック数・平均報酬に加え、プレイブック更新の上位ターゲットや最新統計が表示されます。
 
+### テスト
+
+optional依存をインストールした上で `pytest` を実行します。
+
+```bash
+pip install .[dev]
+PYTHONPATH=./src pytest
+```
+
 ### Claude Code CLI を利用する場合
 
 LLMプランナーを本番モードに切り替えるには `claude code` CLI をインストールした上で、以下のように実行します。
